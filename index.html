@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kenya Clickable SVG Map</title>
+
+
+  <style>
+   
+    /* Container for the inlined SVG */
+    #map-container { 
+
+      max-width: 500px; 
+      margin: 1.25rem auto;
+      padding: 20px;
+      height: auto;
+       margin-top: -20px;
+    }
+
+    /* County styling */
+    svg .county {
+      fill: #4aa832;
+      stroke: #4aa832;
+      stroke-width: 1.2px;
+      transition: fill 150ms ease, stroke 150ms ease, stroke-width 120ms ease;
+      cursor: pointer;
+      /* FIXED: Changed from 'stroke' to 'all' to make entire county clickable */
+      pointer-events: all;
+    }
+
+    /* Hover state */
+    svg .county:hover {
+      stroke: #da251c;
+      stroke-width: 2.4px;
+      fill: rgba(218,37,28,0.15);
+    }
+
+    /* Selected county (clicked) */
+    svg .county.selected {
+      fill: rgba(218,37,28,0.3);
+      stroke: #da251c;
+      stroke-width: 2.6px;
+    }
+
+    /* Focus (keyboard) */
+    svg .county:focus {
+      outline: none;
+      stroke: #ff9800;
+      stroke-width: 2.6px;
+      fill: rgba(255,152,0,0.2);
+    }
+
+    /* Tooltip style */
+    #tooltip {
+      position: fixed;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 4px;
+      pointer-events: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      transform: translate(-50%, -120%);
+      display: none;
+      z-index: 10;
+      color: #2b2b2b;
+    }
+
+    #info-panel {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      color: #666;
+    }
+
+    #info-panel.active {
+      color: #2b2b2b;
+    }
+
+    #info-panel h2 {
+      margin: 0 0 10px 0;
+      color: #da251c;
+    }
+
+
+#svg-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 60vh; /* Reduce from 80vh or more */
+  padding: 0;   /* Remove extra padding if any */
+  margin: 0;
+
+  overflow: hidden;
+  text-align: center;
+}
+
+#svg-wrap svg {
+  display: block;
+  margin: auto;
+  max-width: 100%; /* optional: add some horizontal spacing */
+  height: auto;
+}
+
+/* Optional — force centering if viewBox is off-balance */
+#svg-wrap svg > g {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+
+
+@media screen and (min-width: 1024px) and (max-width: 1600px) {
+  #map-container {
+    padding: 0 !important;
+    height: auto;
+    margin-top: 30px;
+
+  }
+
+  #svg-wrap {
+    height: 100%;
+  }
+
+  #svg-wrap svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+  </style>
+
+</head>
+<body>
+
+                        
+    <div id="map-container">
+      <div id="svg-wrap" aria-live="polite">Loading map…</div>
+    </div>
+
+
+
+    <div id="tooltip" role="status" aria-hidden="true"></div>
+    <div style="margin-top:-20px"><small><p>Hover around the selected counties</p></small></div> 
+
+                    
+  <script>
+    // Path to your SVG file
+    const SVG_FILE = 'kenya.svg';
+
+    // Use the ID codes from your SVG (e.g., "KE-94" for Kilifi)
+    const COUNTY_IDS = [
+      'KE-39',  // Taita Taveta
+      'KE-94',  // Kilifi
+      'KE-23',  // Makueni
+      'KE-25',  // Marsabit
+      'KE-22',  // Machakos
+      'KE-13',  // Kiambu
+      'KE-16',  // Kisii
+      'KE-33',  // Narok
+      'KE-02',  // Bomet
+      'KE-06',   // Embu
+      'KE-15',  // Kirinyaga
+      'KE-18',  // Kitui
+      'KE-40',  // Tana River
+      'KE-36',  // Nyeri
+      'KE-17'   // Kisumu
+      // Add more county IDs as you require
+    ];
+
+    const wrap = document.getElementById('svg-wrap');
+    const tooltip = document.getElementById('tooltip');
+
+
+    fetch(SVG_FILE)
+      .then(r => {
+        if (!r.ok) throw new Error('Could not load SVG: ' + r.status);
+        return r.text();
+      })
+      .then(svgText => {
+        wrap.innerHTML = svgText;
+
+        const svg = wrap.querySelector('svg');
+        if (!svg) throw new Error('SVG not found inside file');
+
+        // Find all potential county elements
+        const candidates = svg.querySelectorAll('path[id], polygon[id], rect[id], g[id], path.county, polygon.county, g.county');
+
+        let counties = Array.from(candidates);
+        if (counties.length === 0) {
+          counties = Array.from(svg.querySelectorAll('path, polygon, rect, g'));
+        }
+
+        // Log all counties with their IDs and titles for reference
+        console.log('=== All Counties with IDs as per the SVG file ===');
+        counties.forEach((el, index) => {
+          const id = el.id || 'no-id';
+          const title = el.getAttribute('title') || 'no-title';
+          console.log(`Index ${index}: ID="${id}" Title="${title}"`);
+        });
+        console.log('=============================');
+
+        counties.forEach((el, index) => {
+          const countyId = el.id;
+          const title = el.getAttribute('title') || countyId || `County-${index}`;
+          el.setAttribute('data-county-name', title);
+          el.setAttribute('data-county-id', countyId);
+
+          // Check if this county ID is in the selected list
+          const isSelected = COUNTY_IDS.includes(countyId);
+
+          if (!isSelected) {
+            // Non-selected counties: not clickable, different styling
+            el.style.cursor = 'default';
+            el.style.pointerEvents = 'none';
+            el.style.opacity = '0.6';
+            return; // Skip adding interactive features
+          }
+
+
+          el.classList.add('county');
+          el.setAttribute('tabindex', '0');
+
+          el.setAttribute('data-county-name', name);
+
+          // Get the county name for display
+          const displayName = el.getAttribute('title') || countyId || `County-${index}`;
+          
+          // Tooltip on hover
+          el.addEventListener('pointerenter', ev => {
+            const rect = ev.target.getBoundingClientRect();
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.top) + 'px';
+            tooltip.textContent = displayName;
+            tooltip.style.display = 'block';
+            tooltip.setAttribute('aria-hidden', 'false');
+          });
+
+          el.addEventListener('pointermove', ev => {
+            tooltip.style.left = (ev.clientX) + 'px';
+            tooltip.style.top = (ev.clientY - 12) + 'px';
+          });
+
+          el.addEventListener('pointerleave', () => {
+            tooltip.style.display = 'none';
+            tooltip.setAttribute('aria-hidden', 'true');
+          });
+
+          // Click handler
+          el.addEventListener('click', e => {
+            e.stopPropagation();
+            
+            // Single selection: clear other selections
+            const svgCounties = svg.querySelectorAll('.county');
+            svgCounties.forEach(c => c.classList.remove('selected'));
+
+            el.classList.add('selected');
+
+
+          });
+
+          // Keyboard support
+          el.addEventListener('keydown', ev => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              el.click();
+            }
+          });
+        });
+
+        // Log selection events
+        window.addEventListener('county-selected', (ev) => {
+          console.log('County selected:', ev.detail.name);
+        });
+
+      })
+      .catch(err => {
+        wrap.innerHTML = '<p style="color:crimson;">Failed to load map: ' + err.message + '</p>';
+        console.error(err);
+      });
+
+    // Click outside to clear selection
+    document.addEventListener('click', (e) => {
+
+    });
+  </script>
+
+
+</body>
+</html>
